@@ -36,5 +36,12 @@ object Main {
       oneOf('a', 'b').kplus,
       List("", "aabbabab", "aa", "aaabbbcc", "caaaaa", "ccacacaca", "bbbbbb", "abababab")
     )
+
+    val d19 = oneOf("123456789": _*)
+    val d09 = oneOf("0123456789": _*)
+    val e3 = d19 * d09.kstar * allOf(" bottles of beer on the wall": _*)
+
+    val e4 = oneOf("1234":_*) * oneOf("1234":_*)
+    println(stream(e4).map(_.mkString).toList)
   }
 }

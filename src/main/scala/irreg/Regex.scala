@@ -53,11 +53,11 @@ object Regex {
         case Var(a) => Stream(Stream(a))
         case Or(lhs, rhs) => iter(lhs) #::: iter(rhs)
         case Then(lhs, rhs) =>
-          val rs = iter(rhs)
-          iter(lhs).flatMap(s => rs.map(s #::: _))
+          iter(lhs).flatMap(s => iter(rhs).map(s #::: _))
         case e @ Star(lhs) =>
           Stream.empty[A] #:: iter(lhs).flatMap(s => iter(e).map(s #::: _))
       }
+
     iter(expr)
   }
 
