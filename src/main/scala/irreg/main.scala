@@ -42,6 +42,9 @@ object Main {
     val e3 = d19 * d09.kstar * allOf(" bottles of beer on the wall": _*)
     println(sample(e3, Generator.rng).mkString)
 
+    val r = oneOf('b', 'c', 'r') * v('a').kplus * v('t')
+    println(stream(r).take(10).map(_.mkString).toList)
+
     val e4 = (v('0') + v('1')).kstar
     val e5 = (v('0') + v('1')).pow(4)
     val e6 = (v('0').kstar * v('1').kstar)
