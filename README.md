@@ -35,7 +35,7 @@ val e3 = d19 * d09.kstar * allOf(" bottles of beer on the wall": _*)
 sample(e3) // 87 bottles of beer on the wall
 ```
 
-The three interesint methods in `Regex` are:
+The three interesting methods in `Regex` are:
 
  * `matches[A](expr: Expr[A], s: IndexedSeq[A]): Boolean`:
   Determine whether `s` matches `expr`. The entire input must be consumed.
