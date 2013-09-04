@@ -42,6 +42,8 @@ object Regex {
     look(expr, 0).exists(_ == string.length)
   }
 
+  import StreamUtil._
+
   /**
    * Stream all possible matching values.
    */
@@ -51,11 +53,9 @@ object Regex {
         case Nul => Stream.empty
         case Empty => Stream(Stream.empty)
         case Var(a) => Stream(Stream(a))
-        case Or(lhs, rhs) => iter(lhs) #::: iter(rhs)
-        case Then(lhs, rhs) =>
-          iter(lhs).flatMap(s => iter(rhs).map(s #::: _))
-        case e @ Star(lhs) =>
-          Stream.empty[A] #:: iter(lhs).flatMap(s => iter(e).map(s #::: _))
+        case Or(lhs, rhs) => interleave(iter(lhs), iter(rhs))
+        case Then(lhs, rhs) => diagonalize(iter(lhs), iter(rhs))
+        case e @ Star(lhs) => Stream.empty #:: diagonalize(iter(lhs), iter(e))
       }
 
     iter(expr)

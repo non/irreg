@@ -40,8 +40,18 @@ object Main {
     val d19 = oneOf("123456789": _*)
     val d09 = oneOf("0123456789": _*)
     val e3 = d19 * d09.kstar * allOf(" bottles of beer on the wall": _*)
+    println(sample(e3, Generator.rng).mkString)
 
-    val e4 = oneOf("1234":_*) * oneOf("1234":_*)
-    println(stream(e4).map(_.mkString).toList)
+    val e4 = (v('0') + v('1')).kstar
+    val e5 = (v('0') + v('1')).pow(4)
+    val e6 = (v('0').kstar * v('1').kstar)
+    println(stream(e4).take(16).map(_.take(4).mkString).toList)
+    println(stream(e5).take(16).map(_.take(4).mkString).toList)
+    println(stream(e6).take(16).map(_.take(4).mkString).toList)
+
+    // val nss = Stream(Stream(1),Stream(2),Stream(3),Stream(4)).map(_.map(_.toString))
+    // println(StreamUtil.diagonalize(nss, nss).map(_.mkString).toList)
+    // val as = Stream(1,2,3,4,5)
+    // println(StreamUtil.interleave(as, as.map(_*10)).toList)
   }
 }
