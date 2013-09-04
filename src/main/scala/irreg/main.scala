@@ -5,15 +5,15 @@ import spire.random.Generator
 
 import irreg.implicits._
 import irreg.std.all._
-import irreg.Expr.{empty, nul, v, allOf, oneOf, upTo, repeat}
+import irreg.Regex._
 
 object Main {
 
   def test(name: String, expr: Expr[Char], cases: List[String]) {
     println(s"test $name: ${expr.show}")
-    println(s"  e.g. ${Regex.sample(expr, Generator.rng).mkString}")
+    println(s"  e.g. ${sample(expr, Generator.rng).mkString}")
     cases.foreach { s =>
-      val b = Regex.matches(expr, s.toCharArray)
+      val b = matches(expr, s.toCharArray)
       println(s"  ${b.show} -> $s")
     }
   }

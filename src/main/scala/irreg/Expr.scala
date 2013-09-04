@@ -69,15 +69,4 @@ object Expr {
       case e => Star(e)
     }
   }
-
-  def empty[A]: Expr[A] = Empty
-  def nul[A]: Expr[A] = Nul
-  def v[A](a: A): Expr[A] = Var(a)
-  def allOf[A](as: A*): Expr[A] = as.map(v).qproduct
-  def oneOf[A](as: A*): Expr[A] = as.map(v).qsum
-
-  def upTo[A](expr: Expr[A], n: Int): Expr[A] =
-    (0 to n).map(i => expr.pow(i)).qsum
-  def repeat[A](expr: Expr[A], m: Int, n: Int): Expr[A] =
-    expr.pow(m) * upTo(expr, n - m)
 }
