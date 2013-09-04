@@ -38,7 +38,7 @@ sample(e3) // 87 bottles of beer on the wall
 The three interesting methods in `Regex` are:
 
  * `matches[A](expr: Expr[A], s: IndexedSeq[A]): Boolean`:
-  Determine whether `s` matches `expr`. The entire input must be consumed.
+  Determine `expr` accepts `s`. The entire input must be consumed.
 
  * `sample[A](expr: Expr[A], rng: Generator): A`:
   Produces a random string that is accepted by `expr`.
