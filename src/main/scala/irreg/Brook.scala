@@ -5,7 +5,7 @@ import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.immutable.{IndexedSeq, LinearSeq}
 import scala.reflect.ClassTag
 
-object #:: {
+object &:: {
   def unapply[A](as: Brook[A]): Option[(A, Brook[A])] =
     if (as.isEmpty) None else Some((as.head, as.tail))
 }
@@ -72,8 +72,8 @@ object Brook {
   }
 
   implicit class PrependOps[A](rhs: => Brook[A]) {
-    def #::(lhs: A): Brook[A] = Cons(lhs, rhs)
-    def #:::(lhs: Brook[A]): Brook[A] = lhs append rhs
+    def &::(lhs: A): Brook[A] = Cons(lhs, rhs)
+    def &:::(lhs: Brook[A]): Brook[A] = lhs append rhs
   }
 
   implicit class NestedOps[A](x: Brook[Brook[A]]) {

@@ -25,4 +25,16 @@ object StreamUtil {
 
   def interleave[B](x: Stream[B], y: Stream[B]): Stream[B] =
     if (x.isEmpty) y else x.head #:: interleave(y, x.tail)
+
+  def concat[B](xss: List[Stream[B]]): Stream[B] =
+    xss.foldLeft(Stream.empty[B])((s, xs) => s #::: xs)
+
+  def interleave[B](xs: List[Stream[B]]): Stream[B] = xs match {
+    case Nil => Stream.empty
+    case x :: Nil => x
+    case x :: y :: Nil => interleave(x, y)
+    case x :: xs =>
+      if (x.isEmpty) interleave(xs)
+      else x.head #:: interleave(xs :+ x.tail) // ugh
+  }
 }

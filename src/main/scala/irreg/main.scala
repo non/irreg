@@ -54,12 +54,12 @@ object Main {
     println(stream(e5).take(16).map(_.take(4).mkString).toList)
     println(stream(e6).take(16).map(_.take(4).mkString).toList)
 
-    // testing possible subsets, possible equality, approx cardinality
-    val x1 = oneOf('0', '1').kstar
-    val x2 = v('0').kstar + v('1').kstar
-    //println(possibleSuperset(x1, x2, confidence=1000))
-    println(relsize_!(x1, x2).take(20).toList)
-    println(relativeSize(x1, x2, confidence=1000))
+    // // testing possible subsets, possible equality, approx cardinality
+    // val x1 = oneOf('0', '1').kstar
+    // val x2 = v('0').kstar + v('1').kstar
+    // //println(possibleSuperset(x1, x2, confidence=1000))
+    // println(relsize_!(x1, x2).take(20).toList)
+    // println(relativeSize(x1, x2, confidence=1000))
 
     // testing diagonalization and interleaving
     // val nss = Stream(Stream(1),Stream(2),Stream(3),Stream(4)).map(_.map(_.toString))

@@ -2,10 +2,12 @@ package irreg
 
 import spire.algebra.Eq
 import spire.implicits._
+import spire.algebra._
 import spire.math._
 import spire.random.Generator
 import irreg.implicits._
 import irreg.std.all._
+import StreamUtil._
 
 /**
  * Regex uses Expr objects to do interesting things.
@@ -36,7 +38,8 @@ object Regex {
         case Nul => Stream.empty
         case Empty => Stream(pos)
         case Var(a) => if (fits(pos, a)) Stream(pos + 1) else Stream.empty
-        case Or(lhs, rhs) => look(lhs, pos) #::: look(rhs, pos)
+        //case Or(lhs, rhs) => look(lhs, pos) #::: look(rhs, pos)
+        case Or(es) => concat(es.map(e => look(e, pos)))
         case Then(lhs, rhs) => look(lhs, pos).flatMap(n => look(rhs, n))
         case e @ Star(lhs) => pos #:: look(lhs, pos).flatMap(n => look(e, n))
       }
@@ -61,8 +64,10 @@ object Regex {
             case `a` #:: tail => Stream(tail)
             case _ => Stream.empty
           }
-        case Or(lhs, rhs) =>
-          look(lhs, stream) #::: look(rhs, stream)
+        // case Or(lhs, rhs) =>
+        //   look(lhs, stream) #::: look(rhs, stream)
+        case Or(es) =>
+          concat(es.map(e => look(e, stream)))
         case Then(lhs, rhs) =>
           look(lhs, stream).flatMap(s => look(rhs, s))
         case e @ Star(lhs) =>
@@ -70,8 +75,6 @@ object Regex {
       }
     look(expr, stream).exists(_.isEmpty)
   }
-
-  import StreamUtil._
 
   /**
    * Stream all possible matching values.
@@ -82,7 +85,8 @@ object Regex {
         case Nul => Stream.empty
         case Empty => Stream(Stream.empty)
         case Var(a) => Stream(Stream(a))
-        case Or(lhs, rhs) => interleave(iter(lhs), iter(rhs))
+        //case Or(lhs, rhs) => interleave(iter(lhs), iter(rhs))
+        case Or(es) => interleave(es.map(iter))
         case Then(lhs, rhs) => diagonalize(iter(lhs), iter(rhs))
         case e @ Star(lhs) => Stream.empty #:: diagonalize(iter(lhs), iter(e))
       }
@@ -98,12 +102,26 @@ object Regex {
   def sample[A](expr: Expr[A], rng: Generator): Stream[A] = {
     val done = Stream.empty[A]
     def yes = rng.nextBoolean
+
+    def chooseFromList(es: List[Expr[A]]): Expr[A] = {
+      def loop(curr: Expr[A], n: Int, es: List[Expr[A]]): Expr[A] =
+        es match {
+          case e :: es => loop(if (rng.nextInt(n + 1) > 0) curr else e, n + 1, es)
+          case Nil => curr
+        }
+      es match {
+        case e :: es => loop(e, 1, es)
+        case Nil => sys.error("!!!")
+      }
+    }
+
     def choose(expr: Expr[A]): Stream[A] =
       expr match {
         case Nul => done
         case Empty => done
         case Var(a) => Stream(a)
-        case Or(lhs, rhs) => choose(if (yes) lhs else rhs)
+        //case Or(lhs, rhs) => choose(if (yes) lhs else rhs)
+        case Or(es) => choose(chooseFromList(es))
         case Then(lhs, rhs) => choose(lhs) #::: choose(rhs)
         case e @ Star(lhs) => if (yes) done else choose(lhs) #::: choose(e)
       }
@@ -143,4 +161,13 @@ object Regex {
       lastOption.flatMap { case (x, y) =>
         if (x == 0 && y == 0) None else Some(Rational(x, x + y))
       }
+
+  // this currently only reorders ors. it should be doing much more
+  def canonical[A: Order](expr: Expr[A]): Expr[A] =
+    expr match {
+      case Or(es) => Or(es.qsorted)
+      case Then(lhs, rhs) => Then(canonical(lhs), canonical(rhs))
+      case Star(lhs) => Star(canonical(lhs))
+      case e => e
+    }
 }
