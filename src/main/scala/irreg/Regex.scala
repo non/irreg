@@ -38,7 +38,6 @@ object Regex {
         case Nul => Stream.empty
         case Empty => Stream(pos)
         case Var(a) => if (fits(pos, a)) Stream(pos + 1) else Stream.empty
-        //case Or(lhs, rhs) => look(lhs, pos) #::: look(rhs, pos)
         case Or(es) => concat(es.map(e => look(e, pos)))
         case Then(lhs, rhs) => look(lhs, pos).flatMap(n => look(rhs, n))
         case e @ Star(lhs) => pos #:: look(lhs, pos).flatMap(n => look(e, n))
@@ -161,6 +160,43 @@ object Regex {
       lastOption.flatMap { case (x, y) =>
         if (x == 0 && y == 0) None else Some(Rational(x, x + y))
       }
+
+  def nfa[A](expr: Expr[A], namer: Namer): Nfa[A] =
+    expr match {
+      case Nul =>
+        Nfa.empty[A](namer(), namer())
+
+      case Empty =>
+        val start = namer()
+        val accept = namer()
+        Nfa.empty[A](start, accept).eps(start, accept)
+
+      case Var(a) =>
+        val start = namer()
+        val accept = namer()
+        Nfa.empty[A](start, accept).add(start, Some(a), accept)
+
+      case Or(es) =>
+        val start = namer()
+        val nfas = es.map(e => nfa(e, namer))
+        val accept = namer()
+        nfas.foldLeft(Nfa.empty[A](start, accept)) { (nfa, e) =>
+          nfa.absorb(e).eps(start, e.start).eps(e.accept, accept)
+        }
+
+      case Then(lhs, rhs) =>
+        val e1 = nfa(lhs, namer)
+        val e2 = nfa(rhs, namer)
+        Nfa.empty[A](e1.start, e2.accept).
+          absorb(e1).absorb(e2).eps(e1.accept, e2.start)
+
+      case Star(lhs) =>
+        val start = namer()
+        val e1 = nfa(lhs, namer)
+        val accept = namer()
+        Nfa.empty[A](start, accept).absorb(e1).
+          eps(start, e1.start).eps(e1.accept, accept).eps(accept, e1.start)
+    }
 
   // this currently only reorders ors. it should be doing much more
   def canonical[A: Order](expr: Expr[A]): Expr[A] =
