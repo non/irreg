@@ -82,8 +82,7 @@ object Main {
       (times.qmean, result)
     }
 
-    def xyz[A: Ordering](e: Expr[A]): Dfa[A] =
-      nfa(e, new Namer).dfa.minimize
+    def xyz[A: Ordering](e: Expr[A]): Dfa[A] = e.minimize
 
     val e1 = (v('f') + v('b')) * v('o') * (v('o').kstar + v('b'))
     val e2 = ((v('f') + v('b')) * v('o') * v('b')) + ((v('f') + v('b')) * v('o').kplus)
@@ -92,6 +91,7 @@ object Main {
     val (t2, dfa2) = bench(xyz(e2))
     println("took %.3fms to build %s" format (t1, dfa1.draw))
     println("took %.3fms to build %s" format (t2, dfa2.draw))
+    println("are they equal? %s" format dfa1 == dfa2)
 
     println(dfa1.accept("bob"))
     println(dfa1.accept("boooo"))
