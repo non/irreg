@@ -67,11 +67,11 @@ object Main {
     // // val as = Stream(1,2,3,4,5)
     // // println(StreamUtil.interleave(as, as.map(_*10)).toList)
 
-    def timer[A](f: => A): (Long, A) = {
+    def timer[A](f: => A): (Double, A) = {
       val t0 = System.nanoTime
       val a = f
       val t = System.nanoTime - t0
-      (t / 1000L, a)
+      (t / 1000000.0, a)
     }
 
     def bench[A](f: => A): (Double, A) = {
@@ -88,7 +88,13 @@ object Main {
     val e1 = (v('f') + v('b')) * v('o') * (v('o').kstar + v('b'))
     val e2 = ((v('f') + v('b')) * v('o') * v('b')) + ((v('f') + v('b')) * v('o').kplus)
 
-    println(bench(xyz(e1).draw))
-    println(bench(xyz(e2).draw))
+    val (t1, dfa1) = bench(xyz(e1))
+    val (t2, dfa2) = bench(xyz(e2))
+    println("took %.3fms to build %s" format (t1, dfa1.draw))
+    println("took %.3fms to build %s" format (t2, dfa2.draw))
+
+    println(dfa1.accept("bob"))
+    println(dfa1.accept("boooo"))
+    println(dfa1.accept("bobb"))
   }
 }
