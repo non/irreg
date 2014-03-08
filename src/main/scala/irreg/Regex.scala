@@ -4,7 +4,7 @@ import spire.algebra.Eq
 import spire.implicits._
 import spire.algebra._
 import spire.math._
-import spire.random.Generator
+import spire.random.mutable.Generator
 import irreg.implicits._
 import irreg.std.all._
 import StreamUtil._

@@ -1,5 +1,12 @@
-scalaVersion := "2.10.2"
+name := "irreg"
 
-libraryDependencies += "org.spire-math" %% "spire" % "0.6.0"
+organization := "org.spire-math"
 
-scalacOptions ++= Seq("-feature", "-language:_")
+scalaVersion := "2.10.3"
+
+libraryDependencies += "org.spire-math" %% "spire" % "0.7.3"
+
+scalacOptions ++= Seq(
+  "-feature",
+  "-language:_"
+)

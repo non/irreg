@@ -2,7 +2,7 @@ package irreg
 
 import spire.algebra._
 import spire.implicits._
-import spire.random.Generator
+import spire.random.mutable.Generator
 import irreg.implicits._
 import irreg.std.all._
 import StreamUtil._
