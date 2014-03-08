@@ -27,7 +27,7 @@ object Regex {
     expr.pow(m) * upTo(expr, n - m)
 
   def check_![A: Eq](parent: Expr[A], child: Expr[A]): Stream[Boolean] =
-    child.stream.map(s => parent.smatches(s))
+    child.stream.map(s => parent.matches(s))
 
   def possibleSuperset[A: Eq](parent: Expr[A], child: Expr[A], confidence: Int = 100): Boolean =
     check_!(parent, child).take(confidence).forall(_ == true)

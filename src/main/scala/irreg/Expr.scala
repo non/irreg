@@ -74,185 +74,162 @@ object Expr {
     }
   }
 
-  implicit def eqv[A: Order] = new Eq[Expr[A]] {
-    def eqv(x: Expr[A], y: Expr[A]): Boolean = x.minimize == y.minimize
+  implicit def exprHasEq[A: Order] = new Eq[Expr[A]] {
+    def eqv(x: Expr[A], y: Expr[A]): Boolean =
+      Compiled(x).minimized == Compiled(y).minimized
   }
 
-  implicit def order[A: Order] = new Order[Expr[A]] {
-    def listCompare(x: List[Expr[A]], y: List[Expr[A]]): Int =
-      (x, y) match {
-        case (Nil, Nil) => 0
-        case (Nil, bs) => -1
-        case (as, Nil) => 1
-        case (a :: as, b :: bs) =>
-          val i = compare(a, b)
-          if (i == 0) listCompare(as, bs) else i
-      }
-
-    def compare(x: Expr[A], y: Expr[A]): Int = (x, y) match {
-      case (a, b) if a == b => 0
-      case (Nul, _) => -1
-      case (_, Nul) => 1
-      case (Empty, _) => -1
-      case (_, Empty) => 1
-      case (Var(a), Var(b)) => a compare b
-      case (Var(_), _) => -1
-      case (_, Var(_)) => 1
-      case (Or(es1), Or(es2)) => listCompare(es1, es2)
-      case (Or(_), _) => -1
-      case (_, Or(_)) => 1
-      case (Then(a, b), Then(c, d)) =>
-        val i = compare(a, c)
-        if (i == 0) compare(b, d) else i
-      case (Then(_, _), _) => -1
-      case (_, Then(_, _)) => 1
-      case (Star(a), Star(b)) => compare(a, b)
-    }
-  }
-
-  // TODO: move more stuff here
   implicit class ExprOps[A](lhs: Expr[A]) {
-    def nfa(): Nfa[A] = {
-      def nfa(expr: Expr[A], namer: Namer): Nfa[A] =
-        expr match {
-          case Nul =>
-            Nfa.empty[A](namer(), namer())
 
-          case Empty =>
-            val start = namer()
-            val accept = namer()
-            Nfa.empty[A](start, accept).eps(start, accept)
+   /**
+    * Perform a traditional regular expression match.
+    * 
+    * The match is anchored, requiring the entire input string to be
+    * matched by expr.
+    */
+   def matches(string: IndexedSeq[A])(implicit ev: Eq[A]): Boolean = {
+     def fits(pos: Int, a: A) = pos < string.length && string(pos) === a
+     def look(expr: Expr[A], pos: Int): Stream[Int] =
+       expr match {
+         case Nul => Stream.empty
+         case Empty => Stream(pos)
+         case Var(a) => if (fits(pos, a)) Stream(pos + 1) else Stream.empty
+         case Or(es) => concat(es.map(e => look(e, pos)))
+         case Then(lhs, rhs) => look(lhs, pos).flatMap(n => look(rhs, n))
+         case e @ Star(lhs) => pos #:: look(lhs, pos).flatMap(n => look(e, n))
+       }
+     look(lhs, 0).exists(_ == string.length)
+   }
+  
+   /**
+    * Perform a traditional regular expression match.
+    * 
+    * The match is anchored, requiring the entire input string to be
+    * matched by expr.
+    */
+   def matches(stream: Stream[A])(implicit ev: Eq[A]): Boolean = {
+     def look(expr: Expr[A], stream: Stream[A]): Stream[Stream[A]] =
+       expr match {
+         case Nul =>
+           Stream.empty
+         case Empty =>
+           Stream(stream)
+         case Var(a) =>
+           stream match {
+             case `a` #:: tail => Stream(tail)
+             case _ => Stream.empty
+           }
+         case Or(es) =>
+           concat(es.map(e => look(e, stream)))
+         case Then(lhs, rhs) =>
+           look(lhs, stream).flatMap(s => look(rhs, s))
+         case e @ Star(lhs) =>
+           stream #:: look(lhs, stream).flatMap(s => look(e, s))
+       }
+     look(lhs, stream).exists(_.isEmpty)
+   }
+  
+   /**
+    * Stream all possible matching values.
+    */
+   def stream()(implicit ev: Eq[A]): Stream[Stream[A]] = {
+     def iter(expr: Expr[A]): Stream[Stream[A]] =
+       expr match {
+         case Nul => Stream.empty
+         case Empty => Stream(Stream.empty)
+         case Var(a) => Stream(Stream(a))
+         case Or(es) => interleave(es.map(iter))
+         case Then(lhs, rhs) => diagonalize(iter(lhs), iter(rhs))
+         case e @ Star(lhs) => Stream.empty #:: diagonalize(iter(lhs), iter(e))
+       }
+  
+     iter(lhs)
+   }
+  
+   /**
+    * Sample an arbitrary matching value. Any value that could be
+    * matched by expr could possibly be returned, although some values
+    * are more likely to be generated than others.
+    */
+   def sample(rng: Generator): Stream[A] = {
+     val done = Stream.empty[A]
+     def yes = rng.nextBoolean
+  
+     def chooseFromList(es: List[Expr[A]]): Expr[A] = {
+       def loop(curr: Expr[A], n: Int, es: List[Expr[A]]): Expr[A] =
+         es match {
+           case e :: es => loop(if (rng.nextInt(n + 1) > 0) curr else e, n + 1, es)
+           case Nil => curr
+         }
+       es match {
+         case e :: es => loop(e, 1, es)
+         case Nil => sys.error("!!!")
+       }
+     }
+  
+     def choose(expr: Expr[A]): Stream[A] =
+       expr match {
+         case Nul => done
+         case Empty => done
+         case Var(a) => Stream(a)
+         case Or(es) => choose(chooseFromList(es))
+         case Then(lhs, rhs) => choose(lhs) #::: choose(rhs)
+         case e @ Star(lhs) => if (yes) done else choose(lhs) #::: choose(e)
+       }
+     choose(lhs)
+   }
+  }
+}
 
-          case Var(a) =>
-            val start = namer()
-            val accept = namer()
-            Nfa.empty[A](start, accept).add(start, Some(a), accept)
-
-          case Or(es) =>
-            val start = namer()
-            val nfas = es.map(e => nfa(e, namer))
-            val accept = namer()
-            nfas.foldLeft(Nfa.empty[A](start, accept)) { (nfa, e) =>
-              nfa.absorb(e).eps(start, e.start).eps(e.accept, accept)
-            }
-
-          case Then(lhs, rhs) =>
-            val e1 = nfa(lhs, namer)
-            val e2 = nfa(rhs, namer)
-            Nfa.empty[A](e1.start, e2.accept).
-              absorb(e1).absorb(e2).eps(e1.accept, e2.start)
-
-          case Star(lhs) =>
-            val start = namer()
-            val e1 = nfa(lhs, namer)
-            val accept = namer()
-            Nfa.empty[A](start, accept).absorb(e1).
-              eps(start, e1.start).eps(e1.accept, accept).eps(accept, e1.start)
-        }
-      nfa(lhs, new Namer())
-    }
-
-    def dfa()(implicit o: Order[A]): Dfa[A] = nfa.dfa
-
-    def minimize()(implicit o: Order[A]): Dfa[A] = nfa.dfa.minimize
-
-    /**
-     * Perform a traditional regular expression match.
-     * 
-     * The match is anchored, requiring the entire input string to be
-     * matched by expr.
-     */
-    def matches(string: IndexedSeq[A])(implicit ev: Eq[A]): Boolean = {
-      def fits(pos: Int, a: A) = pos < string.length && string(pos) === a
-      def look(expr: Expr[A], pos: Int): Stream[Int] =
-        expr match {
-          case Nul => Stream.empty
-          case Empty => Stream(pos)
-          case Var(a) => if (fits(pos, a)) Stream(pos + 1) else Stream.empty
-          case Or(es) => concat(es.map(e => look(e, pos)))
-          case Then(lhs, rhs) => look(lhs, pos).flatMap(n => look(rhs, n))
-          case e @ Star(lhs) => pos #:: look(lhs, pos).flatMap(n => look(e, n))
-        }
-      look(lhs, 0).exists(_ == string.length)
-    }
-
-    /**
-     * Perform a traditional regular expression match.
-     * 
-     * The match is anchored, requiring the entire input string to be
-     * matched by expr.
-     */
-    def smatches(stream: Stream[A])(implicit ev: Eq[A]): Boolean = {
-      def look(expr: Expr[A], stream: Stream[A]): Stream[Stream[A]] =
-        expr match {
-          case Nul =>
-            Stream.empty
-          case Empty =>
-            Stream(stream)
-          case Var(a) =>
-            stream match {
-              case `a` #:: tail => Stream(tail)
-              case _ => Stream.empty
-            }
-          case Or(es) =>
-            concat(es.map(e => look(e, stream)))
-          case Then(lhs, rhs) =>
-            look(lhs, stream).flatMap(s => look(rhs, s))
-          case e @ Star(lhs) =>
-            stream #:: look(lhs, stream).flatMap(s => look(e, s))
-        }
-      look(lhs, stream).exists(_.isEmpty)
-    }
-
-    /**
-     * Stream all possible matching values.
-     */
-    def stream()(implicit ev: Eq[A]): Stream[Stream[A]] = {
-      def iter(expr: Expr[A]): Stream[Stream[A]] =
-        expr match {
-          case Nul => Stream.empty
-          case Empty => Stream(Stream.empty)
-          case Var(a) => Stream(Stream(a))
-          case Or(es) => interleave(es.map(iter))
-          case Then(lhs, rhs) => diagonalize(iter(lhs), iter(rhs))
-          case e @ Star(lhs) => Stream.empty #:: diagonalize(iter(lhs), iter(e))
-        }
-
-      iter(lhs)
-    }
-
-    /**
-     * Sample an arbitrary matching value. Any value that could be
-     * matched by expr could possibly be returned, although some values
-     * are more likely to be generated than others.
-     */
-    def sample(rng: Generator): Stream[A] = {
-      val done = Stream.empty[A]
-      def yes = rng.nextBoolean
-
-      def chooseFromList(es: List[Expr[A]]): Expr[A] = {
-        def loop(curr: Expr[A], n: Int, es: List[Expr[A]]): Expr[A] =
-          es match {
-            case e :: es => loop(if (rng.nextInt(n + 1) > 0) curr else e, n + 1, es)
-            case Nil => curr
+case class Compiled[A: Order](expr: Expr[A]) {
+  def nfa: Nfa[A] = {
+    def nfa(expr: Expr[A], namer: Namer): Nfa[A] =
+      expr match {
+        case Nul =>
+          Nfa.empty[A](namer(), namer())
+          
+        case Empty =>
+          val start = namer()
+          val accept = namer()
+          Nfa.empty[A](start, accept).eps(start, accept)
+          
+        case Var(a) =>
+          val start = namer()
+          val accept = namer()
+          Nfa.empty[A](start, accept).add(start, Some(a), accept)
+          
+        case Or(es) =>
+          val start = namer()
+          val nfas = es.map(e => nfa(e, namer))
+          val accept = namer()
+          nfas.foldLeft(Nfa.empty[A](start, accept)) { (nfa, e) =>
+            nfa.absorb(e).eps(start, e.start).eps(e.accept, accept)
           }
-        es match {
-          case e :: es => loop(e, 1, es)
-          case Nil => sys.error("!!!")
-        }
+          
+        case Then(lhs, rhs) =>
+          val e1 = nfa(lhs, namer)
+          val e2 = nfa(rhs, namer)
+          Nfa.empty[A](e1.start, e2.accept).
+            absorb(e1).absorb(e2).eps(e1.accept, e2.start)
+          
+        case Star(lhs) =>
+          val start = namer()
+          val e1 = nfa(lhs, namer)
+          val accept = namer()
+          Nfa.empty[A](start, accept).absorb(e1).
+            eps(start, e1.start).eps(e1.accept, accept).eps(accept, e1.start)
       }
+    nfa(expr, new Namer())
+  }
+  
+  def dfa: Dfa[A] = nfa.dfa
+  
+  def minimized: Dfa[A] = nfa.dfa.minimize
+}
 
-      def choose(expr: Expr[A]): Stream[A] =
-        expr match {
-          case Nul => done
-          case Empty => done
-          case Var(a) => Stream(a)
-          case Or(es) => choose(chooseFromList(es))
-          case Then(lhs, rhs) => choose(lhs) #::: choose(rhs)
-          case e @ Star(lhs) => if (yes) done else choose(lhs) #::: choose(e)
-        }
-      choose(lhs)
-    }
-
+object Compiled {
+  implicit def compiledHasEq[A] = new Eq[Compiled[A]] {
+    def eqv(x: Compiled[A], y: Compiled[A]): Boolean =
+      x.minimized == y.minimized
   }
 }

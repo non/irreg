@@ -15,7 +15,7 @@ object Main {
     println(s"  e.g. ${expr.sample(Generator.rng).mkString}")
     cases.foreach { s =>
       val b = expr.matches(s.toCharArray)
-      val bb = expr.smatches(s.toStream)
+      val bb = expr.matches(s.toStream)
       assert(b == bb)
       println(s"  $b -> $s")
     }
@@ -83,7 +83,7 @@ object Main {
       (times.qmean, result)
     }
 
-    def xyz[A: Order](e: Expr[A]): Dfa[A] = e.minimize
+    def xyz[A: Order](e: Expr[A]): Dfa[A] = Compiled(e).minimized
 
     val e1 = (v('f') + v('b')) * v('o') * (v('o').kstar + v('b'))
     val e2 = ((v('f') + v('b')) * v('o') * v('b')) + ((v('f') + v('b')) * v('o').kplus)
@@ -94,6 +94,9 @@ object Main {
     val (t1, dfa1) = bench(xyz(e1))
     val (t2, dfa2) = bench(xyz(e2))
     val (t3, dfa3) = bench(xyz(e3))
+
+    println("compiled email address regex in %.3fms: %s" format (t3, dfa3.draw))
+    println("")
     println("took %.3fms to build %s" format (t1, dfa1.draw))
     println("took %.3fms to build %s" format (t2, dfa2.draw))
     println("are they equal? %s" format dfa1 == dfa2)
@@ -103,5 +106,6 @@ object Main {
     println(dfa1.accept("bob"))
     println(dfa1.accept("boooo"))
     println(dfa1.accept("bobb"))
+
   }
 }
