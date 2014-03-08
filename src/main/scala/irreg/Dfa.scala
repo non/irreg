@@ -1,24 +1,26 @@
 package irreg
 
+import spire.algebra.Order
 import scala.collection.mutable
+
+import Order.ordering
 
 case class Dfa[A](start: Int, accept: Set[Int], edges: Map[Int, Map[A, Int]]) {
 
-  def accept(as: Seq[A]): Boolean = {
-    def loop(as: List[A], state: Int): Boolean =
-      as match {
-        case Nil =>
-          accept(state)
-        case a :: tail =>
-          edges.get(state).flatMap(m => m.get(a)) match {
-            case Some(n) => loop(tail, n)
-            case None => false
-          }
+  def accept(as: Iterable[A]): Boolean = {
+    var state: Int = start
+    val it = as.iterator
+    while (it.hasNext) {
+      val a = it.next
+      edges.get(state).flatMap(m => m.get(a)) match {
+        case Some(n) => state = n
+        case None => return false
       }
-    loop(as.toList, start)
+    }
+    accept(state)
   }
 
-  def draw(implicit o: Ordering[A]): String =
+  def draw(implicit o: Order[A]): String =
     edges.map { case (p, m) =>
       (p, m.map { case (k, v) =>
         if (accept(v)) s"$k→[$v]" else s"$k→$v"
@@ -31,7 +33,7 @@ case class Dfa[A](start: Int, accept: Set[Int], edges: Map[Int, Map[A, Int]]) {
   def states: Set[Int] =
     Set(start) | accept | edges.keys.toSet | edges.values.flatMap(_.values).toSet
 
-  def minimize()(implicit o: Ordering[A]): Dfa[A] = {
+  def minimize()(implicit o: Order[A]): Dfa[A] = {
     type P = Set[Int]
     val universe = states.toSeq.sorted
     val p = mutable.Set(accept, universe.toSet -- accept)

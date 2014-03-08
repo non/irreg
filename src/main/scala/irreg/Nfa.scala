@@ -1,6 +1,9 @@
 package irreg
 
+import spire.algebra.Order
 import scala.collection.mutable
+
+import Order.ordering
 
 object Nfa {
   def empty[A](start: Int, accept: Int) = new Nfa[A](start, accept, Map.empty)
@@ -53,7 +56,7 @@ case class Nfa[A](start: Int, accept: Int, edges: Map[Int, Map[Option[A], Set[In
 
   type P = Set[Int]
 
-  def dfa()(implicit o: Ordering[A]): Dfa[A] = {
+  def dfa()(implicit o: Order[A]): Dfa[A] = {
     val alphabet: Seq[A] = edges.values.flatMap {
       _ flatMap {
         case (Some(a), _) => Some(a)

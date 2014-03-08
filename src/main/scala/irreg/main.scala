@@ -1,5 +1,6 @@
 package irreg
 
+import spire.algebra.Order
 import spire.implicits._
 import spire.random.Generator
 
@@ -11,10 +12,10 @@ object Main {
 
   def test(name: String, expr: Expr[Char], cases: List[String]) {
     println(s"test $name: ${expr.show}")
-    println(s"  e.g. ${sample(expr, Generator.rng).mkString}")
+    println(s"  e.g. ${expr.sample(Generator.rng).mkString}")
     cases.foreach { s =>
-      val b = matches(expr, s.toCharArray)
-      val bb = smatches(expr, s.toStream)
+      val b = expr.matches(s.toCharArray)
+      val bb = expr.smatches(s.toStream)
       assert(b == bb)
       println(s"  $b -> $s")
     }
@@ -82,16 +83,22 @@ object Main {
       (times.qmean, result)
     }
 
-    def xyz[A: Ordering](e: Expr[A]): Dfa[A] = e.minimize
+    def xyz[A: Order](e: Expr[A]): Dfa[A] = e.minimize
 
     val e1 = (v('f') + v('b')) * v('o') * (v('o').kstar + v('b'))
     val e2 = ((v('f') + v('b')) * v('o') * v('b')) + ((v('f') + v('b')) * v('o').kplus)
 
+    val az = ('a' to 'z').map(v).qsum
+    val e3 = az.kplus * v('@') * az.kplus * v('.') * az.kplus
+
     val (t1, dfa1) = bench(xyz(e1))
     val (t2, dfa2) = bench(xyz(e2))
+    val (t3, dfa3) = bench(xyz(e3))
     println("took %.3fms to build %s" format (t1, dfa1.draw))
     println("took %.3fms to build %s" format (t2, dfa2.draw))
     println("are they equal? %s" format dfa1 == dfa2)
+
+    println("took %.3fms to build %s" format (t2, dfa3.draw))
 
     println(dfa1.accept("bob"))
     println(dfa1.accept("boooo"))

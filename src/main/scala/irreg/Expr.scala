@@ -5,6 +5,7 @@ import spire.implicits._
 import spire.random.Generator
 import irreg.implicits._
 import irreg.std.all._
+import StreamUtil._
 
 /**
  * Expr[A] implements an AST for regular expressions.
@@ -71,6 +72,10 @@ object Expr {
       case Star(e) => kstar(e)
       case e => Star(e)
     }
+  }
+
+  implicit def eqv[A: Order] = new Eq[Expr[A]] {
+    def eqv(x: Expr[A], y: Expr[A]): Boolean = x.minimize == y.minimize
   }
 
   implicit def order[A: Order] = new Order[Expr[A]] {
@@ -147,8 +152,107 @@ object Expr {
       nfa(lhs, new Namer())
     }
 
-    def dfa()(implicit o: Ordering[A]): Dfa[A] = nfa.dfa
+    def dfa()(implicit o: Order[A]): Dfa[A] = nfa.dfa
 
-    def minimize()(implicit o: Ordering[A]): Dfa[A] = nfa.dfa.minimize
+    def minimize()(implicit o: Order[A]): Dfa[A] = nfa.dfa.minimize
+
+    /**
+     * Perform a traditional regular expression match.
+     * 
+     * The match is anchored, requiring the entire input string to be
+     * matched by expr.
+     */
+    def matches(string: IndexedSeq[A])(implicit ev: Eq[A]): Boolean = {
+      def fits(pos: Int, a: A) = pos < string.length && string(pos) === a
+      def look(expr: Expr[A], pos: Int): Stream[Int] =
+        expr match {
+          case Nul => Stream.empty
+          case Empty => Stream(pos)
+          case Var(a) => if (fits(pos, a)) Stream(pos + 1) else Stream.empty
+          case Or(es) => concat(es.map(e => look(e, pos)))
+          case Then(lhs, rhs) => look(lhs, pos).flatMap(n => look(rhs, n))
+          case e @ Star(lhs) => pos #:: look(lhs, pos).flatMap(n => look(e, n))
+        }
+      look(lhs, 0).exists(_ == string.length)
+    }
+
+    /**
+     * Perform a traditional regular expression match.
+     * 
+     * The match is anchored, requiring the entire input string to be
+     * matched by expr.
+     */
+    def smatches(stream: Stream[A])(implicit ev: Eq[A]): Boolean = {
+      def look(expr: Expr[A], stream: Stream[A]): Stream[Stream[A]] =
+        expr match {
+          case Nul =>
+            Stream.empty
+          case Empty =>
+            Stream(stream)
+          case Var(a) =>
+            stream match {
+              case `a` #:: tail => Stream(tail)
+              case _ => Stream.empty
+            }
+          case Or(es) =>
+            concat(es.map(e => look(e, stream)))
+          case Then(lhs, rhs) =>
+            look(lhs, stream).flatMap(s => look(rhs, s))
+          case e @ Star(lhs) =>
+            stream #:: look(lhs, stream).flatMap(s => look(e, s))
+        }
+      look(lhs, stream).exists(_.isEmpty)
+    }
+
+    /**
+     * Stream all possible matching values.
+     */
+    def stream()(implicit ev: Eq[A]): Stream[Stream[A]] = {
+      def iter(expr: Expr[A]): Stream[Stream[A]] =
+        expr match {
+          case Nul => Stream.empty
+          case Empty => Stream(Stream.empty)
+          case Var(a) => Stream(Stream(a))
+          case Or(es) => interleave(es.map(iter))
+          case Then(lhs, rhs) => diagonalize(iter(lhs), iter(rhs))
+          case e @ Star(lhs) => Stream.empty #:: diagonalize(iter(lhs), iter(e))
+        }
+
+      iter(lhs)
+    }
+
+    /**
+     * Sample an arbitrary matching value. Any value that could be
+     * matched by expr could possibly be returned, although some values
+     * are more likely to be generated than others.
+     */
+    def sample(rng: Generator): Stream[A] = {
+      val done = Stream.empty[A]
+      def yes = rng.nextBoolean
+
+      def chooseFromList(es: List[Expr[A]]): Expr[A] = {
+        def loop(curr: Expr[A], n: Int, es: List[Expr[A]]): Expr[A] =
+          es match {
+            case e :: es => loop(if (rng.nextInt(n + 1) > 0) curr else e, n + 1, es)
+            case Nil => curr
+          }
+        es match {
+          case e :: es => loop(e, 1, es)
+          case Nil => sys.error("!!!")
+        }
+      }
+
+      def choose(expr: Expr[A]): Stream[A] =
+        expr match {
+          case Nul => done
+          case Empty => done
+          case Var(a) => Stream(a)
+          case Or(es) => choose(chooseFromList(es))
+          case Then(lhs, rhs) => choose(lhs) #::: choose(rhs)
+          case e @ Star(lhs) => if (yes) done else choose(lhs) #::: choose(e)
+        }
+      choose(lhs)
+    }
+
   }
 }
