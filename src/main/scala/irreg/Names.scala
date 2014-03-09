@@ -13,8 +13,3 @@ class NameCache[A] {
   def apply(a: A): Int = cache.getOrElseUpdate(a, namer.apply)
   def names: Map[A, Int] = cache.toMap
 }
-
-object Names {
-  def namer: Namer = new Namer
-  def cache[A]: NameCache[A] = new NameCache[A]
-}
