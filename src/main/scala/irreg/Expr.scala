@@ -25,6 +25,7 @@ case class Var[A](a: A) extends Expr[A]
 case class Or[A](es: List[Expr[A]]) extends Expr[A]
 case class Then[A](lhs: Expr[A], rhs: Expr[A]) extends Expr[A]
 case class Star[A](lhs: Expr[A]) extends Expr[A]
+case object Dot extends Expr[Nothing]
 case object Empty extends Expr[Nothing]
 case object Nul extends Expr[Nothing]
 
@@ -35,6 +36,7 @@ object Expr {
     def show(e: Expr[A]) = e match {
       case Empty => "ε"
       case Nul => "∅"
+      case Dot => "."
       case Var(a) => a.show
       case Star(x) => show(x) + "*"
       case Or(es) => es.map(show(_)).mkString("(", "|", ")")
@@ -47,6 +49,8 @@ object Expr {
     def one: Expr[A] = Empty
 
     def plus(x: Expr[A], y: Expr[A]): Expr[A] = (x, y) match {
+      case (Dot, _) => Dot
+      case (_, Dot) => Dot
       case (Nul, e) => e
       case (e, Nul) => e
       case (Empty, Empty) => Empty
@@ -74,10 +78,11 @@ object Expr {
     }
   }
 
-  implicit def exprHasEq[A: Order] = new Eq[Expr[A]] {
-    def eqv(x: Expr[A], y: Expr[A]): Boolean =
-      Compiled(x).minimized == Compiled(y).minimized
-  }
+  implicit def exprHasEq[A: Order](implicit alphabet: List[A]) =
+    new Eq[Expr[A]] {
+      def eqv(x: Expr[A], y: Expr[A]): Boolean =
+        Compiled(x).minimized == Compiled(y).minimized
+    }
 
   implicit class ExprOps[A](lhs: Expr[A]) {
 
@@ -93,6 +98,7 @@ object Expr {
         expr match {
           case Nul => Stream.empty
           case Empty => Stream(pos)
+          case Dot => Stream(pos + 1)
           case Var(a) => if (fits(pos, a)) Stream(pos + 1) else Stream.empty
           case Or(es) => concat(es.map(e => look(e, pos)))
           case Then(lhs, rhs) => look(lhs, pos).flatMap(n => look(rhs, n))
@@ -114,6 +120,11 @@ object Expr {
             Stream.empty
           case Empty =>
             Stream(stream)
+          case Dot =>
+            stream match {
+              case _ #:: tail => Stream(tail)
+              case _ => Stream.empty
+            }
           case Var(a) =>
             stream match {
               case `a` #:: tail => Stream(tail)
@@ -132,11 +143,12 @@ object Expr {
     /**
      * Stream all possible matching values.
      */
-    def stream()(implicit ev: Eq[A]): Stream[Stream[A]] = {
+    def stream()(implicit ev: Eq[A], alphabet: Stream[A]): Stream[Stream[A]] = {
       def iter(expr: Expr[A]): Stream[Stream[A]] =
         expr match {
           case Nul => Stream.empty
           case Empty => Stream(Stream.empty)
+          case Dot => alphabet.map(Stream(_))
           case Var(a) => Stream(Stream(a))
           case Or(es) => interleave(es.map(iter))
           case Then(lhs, rhs) => diagonalize(iter(lhs), iter(rhs))
@@ -151,7 +163,7 @@ object Expr {
      * matched by expr could possibly be returned, although some values
      * are more likely to be generated than others.
      */
-    def sample(rng: Generator): Stream[A] = {
+    def sample(rng: Generator)(implicit alphabet: Generator => A): Stream[A] = {
       val done = Stream.empty[A]
       def yes = rng.nextBoolean
       
@@ -171,6 +183,7 @@ object Expr {
         expr match {
           case Nul => done
           case Empty => done
+          case Dot => Stream(alphabet(rng))
           case Var(a) => Stream(a)
           case Or(es) => choose(chooseFromList(es))
           case Then(lhs, rhs) => choose(lhs) #::: choose(rhs)

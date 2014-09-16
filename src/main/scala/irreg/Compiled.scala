@@ -2,12 +2,15 @@ package irreg
 
 import spire.algebra._
 
-case class Compiled[A: Order](expr: Expr[A]) {
+case class Compiled[A: Order](expr: Expr[A])(implicit alphabet: List[A]) {
   def nfa: Nfa[A] = {
     def nfa(expr: Expr[A], namer: Namer): Nfa[A] =
       expr match {
         case Nul =>
           Nfa.empty[A](namer(), namer())
+
+        case Dot =>
+          nfa(Or(alphabet.map(Var(_))), namer)
           
         case Empty =>
           val start = namer()

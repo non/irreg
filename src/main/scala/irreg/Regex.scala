@@ -32,9 +32,9 @@ object Regex {
   def repeat[A](expr: Expr[A], m: Int, n: Int): Expr[A] =
     expr.pow(m) * upTo(expr, n - m)
 
-  def check_![A: Eq](parent: Expr[A], child: Expr[A]): Stream[Boolean] =
+  def check_![A: Eq](parent: Expr[A], child: Expr[A])(implicit alphabet: Stream[A]): Stream[Boolean] =
     child.stream.map(s => parent.matches(s))
 
-  def possibleSuperset[A: Eq](parent: Expr[A], child: Expr[A], confidence: Int = 100): Boolean =
+  def possibleSuperset[A: Eq](parent: Expr[A], child: Expr[A], confidence: Int = 100)(implicit alphabet: Stream[A]): Boolean =
     check_!(parent, child).take(confidence).forall(_ == true)
 }
